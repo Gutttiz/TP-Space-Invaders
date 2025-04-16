@@ -1,0 +1,163 @@
+import math
+import pygame
+
+# Inicializar Pygame
+pygame.init()
+
+# Crear pantalla
+pantalla = pygame.display.set_mode((800, 600))
+pygame.display.set_caption("Space Invaders")
+
+# Ícono
+icono = pygame.image.load('ovni.png')
+pygame.display.set_icon(icono)
+
+# Jugador
+imagen_jugador_original = pygame.image.load('jugador.png')
+imagen_jugador = pygame.transform.scale(imagen_jugador_original, (50, 50))
+jugador_x = 370
+jugador_y = 520
+jugador_x_cambio = 0
+jugador_velocidad = 0.7
+
+# Enemigos en filas y columnas
+imagen_enemigo_original = pygame.image.load('enemigo.png')
+imagen_enemigo = pygame.transform.scale(imagen_enemigo_original, (35, 35))
+filas = 5
+columnas = 11
+enemigos = []
+inicio_x = 100
+inicio_y = 50
+espaciado_x = 60
+espaciado_y = 50
+direccion = 1  # 1 = derecha, -1 = izquierda
+vel_x = 0.2
+vel_y = 1.1
+
+for fila in range(filas):
+    for columna in range(columnas):
+        enemigos.append({
+            "x": inicio_x + columna * espaciado_x,
+            "y": inicio_y + fila * espaciado_y,
+            "vivo": True
+        })
+
+# Bala
+imagen_bala_original = pygame.image.load('bala.png')
+imagen_bala = pygame.transform.scale(imagen_bala_original, (20, 20))
+bala_x = 0
+bala_y = jugador_y
+bala_y_cambio = 0.5  # más lenta que antes
+bala_estado = "lista"
+
+# Cargar la imagen del muro
+imagen_muro_original = pygame.image.load('muro.png')
+imagen_muro = pygame.transform.scale(imagen_muro_original, (50,40))  # Ajusta el tamaño según sea necesario
+
+# Muros
+muros = [
+    {"x": 200, "y": 400, "salud": 3},
+    {"x": 400, "y": 400, "salud": 3},
+    {"x": 600, "y": 400, "salud": 3}
+]
+
+# Puntaje
+puntaje = 0
+fuente = pygame.font.Font('freesansbold.ttf', 24)
+
+def mostrar_puntaje():
+    texto = fuente.render("Puntaje: " + str(puntaje), True, (255, 255, 255))
+    pantalla.blit(texto, (10, 10))
+
+def mostrar_game_over():
+    fuente_final = pygame.font.Font('freesansbold.ttf', 50)
+    texto = fuente_final.render("FIN DEL JUEGO", True, (255, 255, 255))
+    pantalla.blit(texto, (200, 250))
+
+# Función para dibujar los muros usando la imagen
+def dibujar_muros():
+    for muro in muros:
+        if muro["salud"] > 0:
+            pantalla.blit(imagen_muro, (muro["x"], muro["y"]))
+
+# Bucle principal
+jugando = True
+while jugando:
+    pantalla.fill((0, 0, 0))
+
+    for evento in pygame.event.get():
+        if evento.type == pygame.QUIT:
+            jugando = False
+
+        if evento.type == pygame.KEYDOWN:
+            if evento.key == pygame.K_LEFT:
+                jugador_x_cambio = -jugador_velocidad
+            if evento.key == pygame.K_RIGHT:
+                jugador_x_cambio = jugador_velocidad
+            if evento.key == pygame.K_SPACE and bala_estado == "lista":
+                bala_x = jugador_x + 15
+                bala_estado = "disparando"
+
+        if evento.type == pygame.KEYUP:
+            if evento.key in (pygame.K_LEFT, pygame.K_RIGHT):
+                jugador_x_cambio = 0
+
+    # Mover jugador
+    jugador_x += jugador_x_cambio
+    jugador_x = max(0, min(jugador_x, 800 - 50))
+    pantalla.blit(imagen_jugador, (jugador_x, jugador_y))
+
+    # Movimiento en bloque de los enemigos
+    enemigos_vivos = [e for e in enemigos if e["vivo"]]
+    if enemigos_vivos:
+        min_x = min(e["x"] for e in enemigos_vivos)
+        max_x = max(e["x"] for e in enemigos_vivos)
+        if min_x + direccion * vel_x < 0 or max_x + direccion * vel_x > 800 - 35:
+            direccion *= -1
+            for e in enemigos:
+                if e["vivo"]:
+                    e["y"] += vel_y
+
+    # Dibujar y mover enemigos
+    for enemigo in enemigos:
+        if enemigo["vivo"]:
+            enemigo["x"] += direccion * vel_x
+            pantalla.blit(imagen_enemigo, (enemigo["x"], enemigo["y"]))
+
+            # Fin del juego si bajan mucho
+            if enemigo["y"] > 480:
+                for e in enemigos:
+                    e["vivo"] = False
+                mostrar_game_over()
+
+            # Colisión con la bala
+            if bala_estado == "disparando":
+                distancia = math.hypot(enemigo["x"] - bala_x, enemigo["y"] - bala_y)
+                if distancia < 27:
+                    enemigo["vivo"] = False
+                    bala_y = jugador_y
+                    bala_estado = "lista"
+                    puntaje += 1
+
+    # Movimiento de la bala
+    if bala_estado == "disparando":
+        pantalla.blit(imagen_bala, (bala_x, bala_y))
+        bala_y -= bala_y_cambio
+        if bala_y <= 0:
+            bala_y = jugador_y
+            bala_estado = "lista"
+
+    # Verificar colisión con los muros
+    for muro in muros:
+        if muro["salud"] > 0:
+            # Comprobar si la bala toca el muro
+            if bala_estado == "disparando" and muro["x"] < bala_x < muro["x"] + 120 and muro["y"] < bala_y < muro["y"] + 20:
+                bala_estado = "lista"
+                bala_y = jugador_y
+                muro["salud"] -= 1  # Reducir la salud del muro
+
+    # Dibujar los muros
+    dibujar_muros()
+
+    mostrar_puntaje()
+    pygame.display.update()
