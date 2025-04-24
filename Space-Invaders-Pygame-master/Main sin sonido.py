@@ -5,12 +5,23 @@ import sys
 import time
 pygame.init()
 
+# Fuentes
+fuente_menu = pygame.font.Font("arcade.ttf", 40)
 pantalla = pygame.display.set_mode((800, 600))
 pygame.display.set_caption("Space Invaders")
 
 # Ícono
 icono = pygame.image.load('ovni.jpg')
 pygame.display.set_icon(icono)
+
+# Jugador 
+imagen_jugador_original = pygame.image.load('jugador.png')
+imagen_jugador = pygame.transform.scale(imagen_jugador_original, (55, 50))
+jugador_x = 400
+jugador_y = 520
+jugador_x_cambio = 0
+jugador_velocidad = 0.45
+vidas = 3
 
 # Enemigos por fila
 imagen_alien = pygame.transform.scale(pygame.image.load('alien.png'), (40, 30))
@@ -25,16 +36,8 @@ misterio_activo = False
 tiempo_ultimo_misterio = pygame.time.get_ticks()
 intervalo_misterio = 10000  # 10 segundos
 
-# Fuentes
-fuente_menu = pygame.font.Font("arcade.ttf", 40)
-# Jugador 
-imagen_jugador_original = pygame.image.load('jugador.png')
-imagen_jugador = pygame.transform.scale(imagen_jugador_original, (55, 50))
-jugador_x = 400
-jugador_y = 520
-jugador_x_cambio = 0
-jugador_velocidad = 0.45
-vidas = 3
+
+
 #Bala
 imagen_bala_original = pygame.image.load('bala.png')
 imagen_bala = pygame.transform.scale(imagen_bala_original, (40, 40))
@@ -137,10 +140,10 @@ def dibujar_muros():
             pantalla.blit(imagen, (muro["x"], muro["y"]))
 
 # Sonidos
-sonido_laser = pygame.mixer.Sound('laser.wav')
-canal_laser = pygame.mixer.Channel(1) 
-sonido_laser.set_volume(0.3)
-volumen = 0.05
+#sonido_laser = pygame.mixer.Sound('laser.wav')
+#canal_laser = pygame.mixer.Channel(1) 
+#sonido_laser.set_volume(0.3)
+#volumen = 0.05
 # Colores
 BLANCO = (255, 255, 255)
 GRIS = (100, 100, 100)
@@ -161,6 +164,7 @@ imagen_titulo = pygame.transform.scale(imagen_titulo, (600, 150))
 
 # Pantalla de Inicio
 def pantalla_inicio():
+    global en_menu
     en_menu = True
     opciones = ["Jugar", "Como jugar", "Configuracion", "Salir"]
     botones = []   
@@ -284,22 +288,23 @@ def pantalla_configuracion():
                     volumen = max(0.0, min(1.0, volumen))  # Asegura que esté en rango
 
         # Actualizar volumen de la música y efectos
-        pygame.mixer.music.set_volume(volumen)
-        sonido_laser.set_volume(volumen)
+        #pygame.mixer.music.set_volume(volumen)
+        #sonido_laser.set_volume(volumen)
 
         pygame.display.update()
 pantalla_inicio()
 
 # Música de fondo y sonidos
-pygame.mixer.music.load('fondo.mp3')
-pygame.mixer.music.set_volume(volumen)
-pygame.mixer.music.play(-1)  # Reproduce en bucle
+#pygame.mixer.music.load('fondo.mp3')
+#pygame.mixer.music.set_volume(volumen)
+#pygame.mixer.music.play(-1)  # Reproduce en bucle
 tiempo_ultima_animacion = pygame.time.get_ticks()
 intervalo_animacion = 500  # milisegundos
 
 # Bucle principal del juego
 en_pausa = False
 jugando = True
+
 while jugando:
     pantalla.fill((0, 0, 0))
 
@@ -316,7 +321,7 @@ while jugando:
                 bala_x = jugador_x + 15
                 bala_y = jugador_y
                 bala_estado = "disparando"
-                canal_laser.play(sonido_laser, maxtime=300)
+                #canal_laser.play(sonido_laser, maxtime=300)
             elif evento.key == pygame.K_p:
                 en_pausa = not en_pausa
         elif evento.type == pygame.KEYUP:
@@ -348,7 +353,7 @@ while jugando:
             pygame.display.update()
             pygame.time.delay(1000)          
         en_pausa = False
-        pygame.mixer.music.unpause()
+        #pygame.mixer.music.unpause()
         continue  # Saltar el resto del bucle y volver a iterar
 
     # Movimiento del jugador
@@ -366,7 +371,7 @@ while jugando:
             atacante = random.choice(enemigos_primera_fila)
             balas_enemigas.append({"x": atacante["x"] + 10, "y": atacante["y"] + 20})
             tiempo_ultimo_disparo = tiempo_actual
-            canal_laser.play(sonido_laser, maxtime=300)
+            #canal_laser.play(sonido_laser, maxtime=300)
 
     # Movimiento en bloque de enemigos
     enemigos_vivos = [e for e in enemigos if e["vivo"]]
@@ -392,11 +397,17 @@ while jugando:
             pantalla.blit(imagen_actual, (enemigo["x"], enemigo["y"]))
 
             # Fin del juego si bajan
-            if vidas <= 0:
+            if enemigo["y"] > 480:
+                mostrar_fin_de_juego()
+            if vidas <= 0 and en_menu == True:
+                vidas = 3 
+                puntaje = 0
                 mostrar_fin_de_juego()
                 pygame.display.update()
-                time.sleep(2)
-                pantalla_inicio()  
+                
+
+                pantalla_inicio() 
+
 
             # Colisión con bala del jugador
             if bala_estado == "disparando":
@@ -426,9 +437,7 @@ while jugando:
             balas_enemigas.remove(bala)
             if vidas <= 0:
                 mostrar_fin_de_juego()
-                jugando = False
                 pantalla_inicio()
-
 
         # Colisión con muros
         for muro in muros:
@@ -440,7 +449,6 @@ while jugando:
         # Si sale de pantalla
         if bala["y"] > 600:
             balas_enemigas.remove(bala)
-    
         tiempo_actual = pygame.time.get_ticks()
 
         if not misterio_activo and tiempo_actual - tiempo_ultimo_misterio > intervalo_misterio:

@@ -2,7 +2,6 @@ import math
 import pygame 
 import random
 import sys
-import json
 import time
 pygame.init()
 
@@ -47,27 +46,6 @@ bala_estado = "lista"
 puntaje = 0
 fuente = pygame.font.Font('arcade.ttf', 22)# Enemigo animado que usabas
 
-def mostrar_puntajes():
-    # Esta es la función que muestra los puntajes
-    puntajes = obtener_puntajes_json()  # Asumiendo que tienes esta función
-    pantalla.fill((0, 0, 0))
-    titulo = fuente_menu.render("Puntajes", True, AMARILLO)
-    pantalla.blit(titulo, (300, 50))
-
-    for i, entrada in enumerate(sorted(puntajes, key=lambda x: x["puntaje"], reverse=True)):
-        texto = fuente.render(f"{entrada['nombre']}: {entrada['puntaje']}", True, BLANCO)
-        pantalla.blit(texto, (300, 150 + i * 30))
-
-    pygame.display.update()
-
-    esperando = True
-    while esperando:
-        for evento in pygame.event.get():
-            if evento.type == pygame.QUIT:
-                pygame.quit()
-                exit()
-            elif evento.type == pygame.KEYDOWN and evento.key == pygame.K_ESCAPE:
-                esperando = False  # Regresar al menú de inicio
 # Mostrar Puntaje
 def mostrar_puntaje():
     texto = fuente.render("Puntaje " + str(puntaje), True, AMARILLO)
@@ -82,9 +60,6 @@ def mostrar_fin_de_juego():
     texto_game_over = fuente_menu.render("FIN  DEL JUEGO", True, AMARILLO)
     pantalla.blit(texto_game_over, (250, 250))
     pygame.display.update()
-    pygame.mixer.music.stop()
-    nombre_jugador = "Jugador1"  # Podrías hacer un input en una pantalla de Game Over
-    guardar_puntaje_json(nombre_jugador, puntaje)
 
     # Guardar el tiempo actual
     tiempo_inicio = pygame.time.get_ticks()
@@ -162,9 +137,9 @@ def dibujar_muros():
             pantalla.blit(imagen, (muro["x"], muro["y"]))
 
 # Sonidos
-sonido_laser = pygame.mixer.Sound('laser.wav')
-canal_laser = pygame.mixer.Channel(1) 
-sonido_laser.set_volume(0.3)
+#sonido_laser = pygame.mixer.Sound('laser.wav')
+#canal_laser = pygame.mixer.Channel(1) 
+#sonido_laser.set_volume(0.3)
 volumen = 0.05
 # Colores
 BLANCO = (255, 255, 255)
@@ -183,170 +158,14 @@ def dibujar_boton(texto, x, y, ancho, alto, activo):
 # Titulo
 imagen_titulo = pygame.image.load('titulo.png') 
 imagen_titulo = pygame.transform.scale(imagen_titulo, (600, 150))
+def jugar():
+    global jugador_x, jugador_y, jugador_x_cambio, vidas, puntaje, bala_estado, bala_x, bala_y, enemigos, balas_enemigas, jugar
+    # Reiniciar enemigos
+    for e in enemigos:
+        e["x"] = inicio_x + (e["fila"] * espaciado_x)
+        e["y"] = inicio_y + (e["fila"] * espaciado_y)
+        e["vivo"] = True
 
-def guardar_puntaje_json(nombre, puntaje):
-    try:
-        with open("puntajes.json", "r") as archivo:
-            puntajes = json.load(archivo)
-    except (FileNotFoundError, json.JSONDecodeError):
-        puntajes = []
-
-    puntajes.append({"nombre": nombre, "puntaje": puntaje})
-
-    with open("puntajes.json", "w") as archivo:
-        json.dump(puntajes, archivo, indent=4)
-
-def obtener_puntajes_json():
-    try:
-        with open("puntajes.json", "r") as archivo:
-            return json.load(archivo)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
-
-
-# Pantalla de Inicio
-def pantalla_inicio():
-    en_menu = True
-    opciones = ["Jugar", "Como jugar", "Configuracion", "Salir"]
-    botones = []   
-    ancho_boton = 200
-    alto_boton = 70
-    centro_x = (800 - ancho_boton) // 2
-    inicio_y = 250 
-
-    for i, opcion in enumerate(opciones):
-        rect = pygame.Rect(centro_x, inicio_y + i * 50, ancho_boton, alto_boton)
-        botones.append((opcion, rect))
-
-    click_procesado = False
-
-    while en_menu:
-        pantalla.fill((0, 0, 0)) 
-        pantalla.blit(imagen_titulo, (100, 30)) 
-        
-        mouse_pos = pygame.mouse.get_pos()
-        mouse_click = pygame.mouse.get_pressed()
-
-        for opcion, rect in botones:
-            activo = rect.collidepoint(mouse_pos)
-            color = NEGRO
-            pygame.draw.rect(pantalla, color, rect)
-            etiqueta = fuente_menu.render(opcion, True, AMARILLO)
-            etiqueta_rect = etiqueta.get_rect(center=rect.center)
-            pantalla.blit(etiqueta, etiqueta_rect)
-
-            if activo and mouse_click[0] and not click_procesado:
-                click_procesado = True
-                if opcion == "Jugar":
-                    en_menu = False  # Salir del menú de inicio
-                elif opcion == "Como jugar":
-                    pantalla_como_jugar()
-                elif opcion == "Configuracion":
-                    pantalla_configuracion()
-                elif opcion == "Salir":
-                    pygame.quit()
-                    exit()
-
-        if not mouse_click[0]:
-            click_procesado = False
-
-        for evento in pygame.event.get():
-            if evento.type == pygame.QUIT:
-                pygame.quit()
-                exit()
-            if evento.type == pygame.KEYDOWN:
-                if evento.key == pygame.K_ESCAPE:
-                    en_menu = False
-
-        pygame.display.update()
-    
-    
-    juego()
-
-
-def pantalla_como_jugar():
-    mostrando = True
-    while mostrando:
-        pantalla.fill((0, 0, 0))
-        instrucciones = [
-            "Utiliza las flechas Izquierda y Derecha para moverte",
-            "Espacio para disparar",
-            "Intenta que las balas no te alcancen",
-            "Podes protegerte con los muros",
-            "Presiona ESCAPE para volver al menu de inicio"
-        ]
-        for i, linea in enumerate(instrucciones):
-            texto = fuente.render(linea, True, BLANCO)
-            pantalla.blit(texto, (200, 150 + i * 40))
-
-        for evento in pygame.event.get():
-            if evento.type == pygame.QUIT:
-                pygame.quit()
-                exit()
-            if evento.type == pygame.KEYDOWN and evento.key == pygame.K_ESCAPE:
-                mostrando = False
-
-        pygame.display.update()
-
-def pantalla_configuracion():
-    global volumen
-    mostrando = True
-
-    barra_x = 250
-    barra_y = 300
-    barra_ancho = 300
-    barra_alto = 20
-
-    while mostrando:
-        pantalla.fill((0, 0, 0))
-
-        # Texto del volumen
-        texto = fuente.render(f"Volumen {int(volumen * 100)} Porciento", True, AMARILLO)
-        pantalla.blit(texto, (300, 200))
-
-        instrucciones = [
-                    "Utiliza las flechas Arriba y Abajo para subir o bajar el volumen",
-                    "Click para mover o bajar el volumen",
-                        ]
-        for i, linea in enumerate(instrucciones):
-                texto = fuente.render(linea, True, BLANCO)
-                pantalla.blit(texto, (100, 300 + i * 40))
-
-        for evento in pygame.event.get():
-            if evento.type == pygame.QUIT:
-                pygame.quit()
-                exit()
-            elif evento.type == pygame.KEYDOWN:
-                if evento.key == pygame.K_ESCAPE:
-                    mostrando = False
-                elif evento.key == pygame.K_UP:
-                    volumen = min(1.0, volumen + 0.05)
-                elif evento.key == pygame.K_DOWN:
-                    volumen = max(0.0, volumen - 0.05)
-
-            elif evento.type == pygame.MOUSEBUTTONDOWN:
-                mouse_x, mouse_y = pygame.mouse.get_pos()
-                if (barra_x <= mouse_x <= barra_x + barra_ancho and
-                    barra_y <= mouse_y <= barra_y + barra_alto):
-                    volumen = (mouse_x - barra_x) / barra_ancho
-                    volumen = max(0.0, min(1.0, volumen))  # Asegura que esté en rango
-
-        # Actualizar volumen de la música y efectos
-        pygame.mixer.music.set_volume(volumen)
-        sonido_laser.set_volume(volumen)
-
-        pygame.display.update()
-pantalla_inicio()
-
-# Música de fondo y sonidos
-pygame.mixer.music.load('fondo.mp3')
-pygame.mixer.music.set_volume(volumen)
-pygame.mixer.music.play(-1)  # Reproduce en bucle
-tiempo_ultima_animacion = pygame.time.get_ticks()
-intervalo_animacion = 500  # milisegundos
-
-# Bucle principal del juego
-def juego():
     en_pausa = False
     jugando = True
     while jugando:
@@ -365,7 +184,7 @@ def juego():
                     bala_x = jugador_x + 15
                     bala_y = jugador_y
                     bala_estado = "disparando"
-                    canal_laser.play(sonido_laser, maxtime=300)
+                    #canal_laser.play(sonido_laser, maxtime=300)
                 elif evento.key == pygame.K_p:
                     en_pausa = not en_pausa
             elif evento.type == pygame.KEYUP:
@@ -397,7 +216,7 @@ def juego():
                 pygame.display.update()
                 pygame.time.delay(1000)          
             en_pausa = False
-            pygame.mixer.music.unpause()
+            #pygame.mixer.music.unpause()
             continue  # Saltar el resto del bucle y volver a iterar
 
         # Movimiento del jugador
@@ -415,7 +234,7 @@ def juego():
                 atacante = random.choice(enemigos_primera_fila)
                 balas_enemigas.append({"x": atacante["x"] + 10, "y": atacante["y"] + 20})
                 tiempo_ultimo_disparo = tiempo_actual
-                canal_laser.play(sonido_laser, maxtime=300)
+                #canal_laser.play(sonido_laser, maxtime=300)
 
         # Movimiento en bloque de enemigos
         enemigos_vivos = [e for e in enemigos if e["vivo"]]
@@ -443,10 +262,9 @@ def juego():
                 # Fin del juego si bajan
                 if vidas <= 0:
                     mostrar_fin_de_juego()
-                    pantalla_inicio()
                     pygame.display.update()
                     time.sleep(2)
-                    
+                    pantalla_inicio()  
 
                 # Colisión con bala del jugador
                 if bala_estado == "disparando":
@@ -522,3 +340,144 @@ def juego():
         mostrar_puntaje()
         mostrar_vidas()
         pygame.display.update() 
+
+# Pantalla de Inicio
+def pantalla_inicio():
+    en_menu = True
+    opciones = ["Jugar", "Como jugar", "Configuracion", "Salir"]
+    botones = []   
+    ancho_boton = 200
+    alto_boton = 70
+    centro_x = (800 - ancho_boton) // 2
+    inicio_y = 250 
+
+    for i, opcion in enumerate(opciones):
+        rect = pygame.Rect(centro_x, inicio_y + i * 50, ancho_boton, alto_boton)
+        botones.append((opcion, rect))
+
+    click_procesado = False
+
+    while en_menu:
+        pantalla.fill((0, 0, 0)) 
+        pantalla.blit(imagen_titulo, (100, 30)) 
+        
+        mouse_pos = pygame.mouse.get_pos()
+        mouse_click = pygame.mouse.get_pressed()
+
+        for opcion, rect in botones:
+            activo = rect.collidepoint(mouse_pos)
+            color = NEGRO
+            pygame.draw.rect(pantalla, color, rect)
+            etiqueta = fuente_menu.render(opcion, True, AMARILLO)
+            etiqueta_rect = etiqueta.get_rect(center=rect.center)
+            pantalla.blit(etiqueta, etiqueta_rect)
+
+            if activo and mouse_click[0] and not click_procesado:
+                click_procesado = True
+                if opcion == "Jugar":
+                    en_menu = False
+                    jugar()
+                elif opcion == "Como jugar":
+                    pantalla_como_jugar()
+                elif opcion == "Configuracion":
+                    pantalla_configuracion()
+                elif opcion == "Salir":
+                    pygame.quit()
+                    exit()
+
+        if not mouse_click[0]:
+            click_procesado = False
+
+        for evento in pygame.event.get():
+            if evento.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            if evento.type == pygame.KEYDOWN:
+                if evento.key == pygame.K_ESCAPE:
+                    en_menu = False
+
+        pygame.display.update()
+
+
+def pantalla_como_jugar():
+    mostrando = True
+    while mostrando:
+        pantalla.fill((0, 0, 0))
+        instrucciones = [
+            "Utiliza las flechas Izquierda y Derecha para moverte",
+            "Espacio para disparar",
+            "Intenta que las balas no te alcancen",
+            "Podes protegerte con los muros",
+            "Presiona ESCAPE para volver al menu de inicio"
+        ]
+        for i, linea in enumerate(instrucciones):
+            texto = fuente.render(linea, True, BLANCO)
+            pantalla.blit(texto, (200, 150 + i * 40))
+
+        for evento in pygame.event.get():
+            if evento.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            if evento.type == pygame.KEYDOWN and evento.key == pygame.K_ESCAPE:
+                mostrando = False
+
+        pygame.display.update()
+
+def pantalla_configuracion():
+    global volumen
+    mostrando = True
+
+    barra_x = 250
+    barra_y = 300
+    barra_ancho = 300
+    barra_alto = 20
+
+    while mostrando:
+        pantalla.fill((0, 0, 0))
+
+        # Texto del volumen
+        texto = fuente.render(f"Volumen {int(volumen * 100)} Porciento", True, AMARILLO)
+        pantalla.blit(texto, (300, 200))
+
+        instrucciones = [
+                    "Utiliza las flechas Arriba y Abajo para subir o bajar el volumen",
+                    "Click para mover o bajar el volumen",
+                        ]
+        for i, linea in enumerate(instrucciones):
+                texto = fuente.render(linea, True, BLANCO)
+                pantalla.blit(texto, (100, 300 + i * 40))
+
+        for evento in pygame.event.get():
+            if evento.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            elif evento.type == pygame.KEYDOWN:
+                if evento.key == pygame.K_ESCAPE:
+                    mostrando = False
+                elif evento.key == pygame.K_UP:
+                    volumen = min(1.0, volumen + 0.05)
+                elif evento.key == pygame.K_DOWN:
+                    volumen = max(0.0, volumen - 0.05)
+
+            elif evento.type == pygame.MOUSEBUTTONDOWN:
+                mouse_x, mouse_y = pygame.mouse.get_pos()
+                if (barra_x <= mouse_x <= barra_x + barra_ancho and
+                    barra_y <= mouse_y <= barra_y + barra_alto):
+                    volumen = (mouse_x - barra_x) / barra_ancho
+                    volumen = max(0.0, min(1.0, volumen))  # Asegura que esté en rango
+
+        # Actualizar volumen de la música y efectos
+        #pygame.mixer.music.set_volume(volumen)
+        #sonido_laser.set_volume(volumen)
+
+        pygame.display.update()
+pantalla_inicio()
+
+# Música de fondo y sonidos
+#pygame.mixer.music.load('fondo.mp3')
+#pygame.mixer.music.set_volume(volumen)
+#pygame.mixer.music.play(-1)  # Reproduce en bucle
+tiempo_ultima_animacion = pygame.time.get_ticks()
+intervalo_animacion = 500  # milisegundos
+
+# Bucle principal del juego
