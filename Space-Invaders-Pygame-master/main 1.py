@@ -1,6 +1,9 @@
 import math
 import pygame 
 import random
+import sys
+import json
+import time
 pygame.init()
 
 pantalla = pygame.display.set_mode((800, 600))
@@ -10,26 +13,61 @@ pygame.display.set_caption("Space Invaders")
 icono = pygame.image.load('ovni.jpg')
 pygame.display.set_icon(icono)
 
+# Enemigos por fila
+imagen_alien = pygame.transform.scale(pygame.image.load('alien.png'), (40, 30))
+imagen_alien1 = pygame.transform.scale(pygame.image.load('alien1.png'), (40, 30))
+
+# Nave Misteriosa
+imagen_misterio = pygame.transform.scale(pygame.image.load('misterio.png'), (50, 30))
+misterio_x = -80  # Fuera de pantalla
+misterio_y = 35
+misterio_vel = 0.25
+misterio_activo = False
+tiempo_ultimo_misterio = pygame.time.get_ticks()
+intervalo_misterio = 10000  # 10 segundos
+
 # Fuentes
 fuente_menu = pygame.font.Font("arcade.ttf", 40)
 # Jugador 
 imagen_jugador_original = pygame.image.load('jugador.png')
-imagen_jugador = pygame.transform.scale(imagen_jugador_original, (55, 55))
+imagen_jugador = pygame.transform.scale(imagen_jugador_original, (55, 50))
 jugador_x = 400
-jugador_y = 540
+jugador_y = 520
 jugador_x_cambio = 0
 jugador_velocidad = 0.45
 vidas = 3
 #Bala
 imagen_bala_original = pygame.image.load('bala.png')
-imagen_bala = pygame.transform.scale(imagen_bala_original, (30, 30))
+imagen_bala = pygame.transform.scale(imagen_bala_original, (40, 40))
 bala_x = 0
 bala_y = jugador_y
 bala_y_cambio = 0.5
 bala_estado = "lista"
 #Puntaje
 puntaje = 0
-fuente = pygame.font.Font('arcade.ttf', 22)
+fuente = pygame.font.Font('arcade.ttf', 22)# Enemigo animado que usabas
+
+def mostrar_puntajes():
+    # Esta es la función que muestra los puntajes
+    puntajes = obtener_puntajes_json()  # Asumiendo que tienes esta función
+    pantalla.fill((0, 0, 0))
+    titulo = fuente_menu.render("Puntajes", True, AMARILLO)
+    pantalla.blit(titulo, (300, 50))
+
+    for i, entrada in enumerate(sorted(puntajes, key=lambda x: x["puntaje"], reverse=True)):
+        texto = fuente.render(f"{entrada['nombre']}: {entrada['puntaje']}", True, BLANCO)
+        pantalla.blit(texto, (300, 150 + i * 30))
+
+    pygame.display.update()
+
+    esperando = True
+    while esperando:
+        for evento in pygame.event.get():
+            if evento.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            elif evento.type == pygame.KEYDOWN and evento.key == pygame.K_ESCAPE:
+                esperando = False  # Regresar al menú de inicio
 # Mostrar Puntaje
 def mostrar_puntaje():
     texto = fuente.render("Puntaje " + str(puntaje), True, AMARILLO)
@@ -37,52 +75,85 @@ def mostrar_puntaje():
 # Vidas
 def mostrar_vidas():
     texto = fuente.render("Vidas  " + str(vidas), True, AZUL)
-    pantalla.blit(texto, (680, 560))
+    pantalla.blit(texto, (710, 570))
 # Mostrar fin de juego
 def mostrar_fin_de_juego():
-    fuente_final = pygame.font.Font('arcade.ttf', 50)
-    texto = fuente_final.render("FIN DEL JUEGO", True, AMARILLO)
-    pantalla.blit(texto, (200, 250))
+    pantalla.fill(NEGRO)
+    texto_game_over = fuente_menu.render("FIN  DEL JUEGO", True, AMARILLO)
+    pantalla.blit(texto_game_over, (250, 250))
+    pygame.display.update()
+    pygame.mixer.music.stop()
+    nombre_jugador = "Jugador1"  # Podrías hacer un input en una pantalla de Game Over
+    guardar_puntaje_json(nombre_jugador, puntaje)
+
+    # Guardar el tiempo actual
+    tiempo_inicio = pygame.time.get_ticks()
+
+    # Esperar 2 segundos sin congelar el juego
+    esperando = True
+    while esperando:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+        # Si pasaron 2000 milisegundos (2 segundos)
+        if pygame.time.get_ticks() - tiempo_inicio > 1000:
+            esperando = False
+
 
 # Enemigos
-imagen_enemigo_1 = pygame.transform.scale(pygame.image.load('enemigos.png'), (45, 36))
-imagen_enemigo_2 = pygame.transform.scale(pygame.image.load('enemigos1.png'), (45, 36))
+imagen_enemigo_1 = pygame.transform.scale(pygame.image.load('enemigos.png'), (45, 35))
+imagen_enemigo_2 = pygame.transform.scale(pygame.image.load('enemigos1.png'), (45, 35))
 imagenes_enemigo = [imagen_enemigo_1, imagen_enemigo_2]
 indice_animacion = 0 
 filas = 3
 columnas = 10
 enemigos = []
 inicio_x = 100
-inicio_y = 50
-espaciado_x = 50
-espaciado_y = 40
+inicio_y = 70
+espaciado_x = 60
+espaciado_y = 50
 direccion = 1
 vel_x = 0.12
 vel_y = 11
 
 for fila in range(filas):
     for columna in range(columnas):
+        if fila == 0:
+            imagen = imagen_alien
+        elif fila == 1:
+            imagen = imagen_alien1
+        else:
+            imagen = imagenes_enemigo[0]  # Primer fotograma de animación
+
         enemigos.append({
             "x": inicio_x + columna * espaciado_x,
             "y": inicio_y + fila * espaciado_y,
             "fila": fila,
-            "vivo": True
+            "vivo": True,
+            "imagen": imagen
         })
+
+def guardar_puntaje(nombre, puntaje):
+    with open("puntajes.txt", "a") as archivo:
+        archivo.write(f"{nombre}:{puntaje}\n")
+
 # Bala
 imagen_bala_enemigo = pygame.transform.flip(imagen_bala, False, True)
 balas_enemigas = []
 tiempo_ultimo_disparo = 0
 # Muros
 imagenes_muros = {
-    1: pygame.transform.scale(pygame.image.load('Murotarribaizquierdaderechaymedio,izquierdayderechamedioymedio.png'), (50, 40)),
-    2: pygame.transform.scale(pygame.image.load('Murotarribaizquierdaderechaymedio.png'), (50, 40)),
-    3: pygame.transform.scale(pygame.image.load('Murotarribaizquierdayderecha.png'), (50, 40)),
-    4: pygame.transform.scale(pygame.image.load('Murotarribaderecha.png'), (50, 40)),
-    5: pygame.transform.scale(pygame.image.load('Muro.png'), (50, 40))}
+    1: pygame.transform.scale(pygame.image.load('Murotarribaizquierdaderechaymedio,izquierdayderechamedioymedio.png'), (70, 60)),
+    2: pygame.transform.scale(pygame.image.load('Murotarribaizquierdaderechaymedio.png'), (70, 60)),
+    3: pygame.transform.scale(pygame.image.load('Murotarribaizquierdayderecha.png'), (70, 60)),
+    4: pygame.transform.scale(pygame.image.load('Murotarribaderecha.png'), (70, 60)),
+    5: pygame.transform.scale(pygame.image.load('Muro.png'), (70, 60))}
 muros = [
-    {"x": 200, "y": 400, "salud": 5},
-    {"x": 400, "y": 400, "salud": 5},
-    {"x": 600, "y": 400, "salud": 5}]
+    {"x": 193, "y": 450, "salud": 5},
+    {"x": 393, "y": 450, "salud": 5},
+    {"x": 593, "y": 450, "salud": 5}]
 
 def dibujar_muros():
     for muro in muros:
@@ -94,8 +165,7 @@ def dibujar_muros():
 sonido_laser = pygame.mixer.Sound('laser.wav')
 canal_laser = pygame.mixer.Channel(1) 
 sonido_laser.set_volume(0.3)
-volumen = 0.1
-
+volumen = 0.05
 # Colores
 BLANCO = (255, 255, 255)
 GRIS = (100, 100, 100)
@@ -114,10 +184,30 @@ def dibujar_boton(texto, x, y, ancho, alto, activo):
 imagen_titulo = pygame.image.load('titulo.png') 
 imagen_titulo = pygame.transform.scale(imagen_titulo, (600, 150))
 
+def guardar_puntaje_json(nombre, puntaje):
+    try:
+        with open("puntajes.json", "r") as archivo:
+            puntajes = json.load(archivo)
+    except (FileNotFoundError, json.JSONDecodeError):
+        puntajes = []
+
+    puntajes.append({"nombre": nombre, "puntaje": puntaje})
+
+    with open("puntajes.json", "w") as archivo:
+        json.dump(puntajes, archivo, indent=4)
+
+def obtener_puntajes_json():
+    try:
+        with open("puntajes.json", "r") as archivo:
+            return json.load(archivo)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+
 # Pantalla de Inicio
 def pantalla_inicio():
     en_menu = True
-    opciones = ["Jugar", "Como jugar", "Configuracion", "Salir"]
+    opciones = ["Jugar", "Como jugar", "Puntajes", "Configuracion", "Salir"]
     botones = []   
     ancho_boton = 200
     alto_boton = 70
@@ -153,6 +243,8 @@ def pantalla_inicio():
                     pantalla_como_jugar()
                 elif opcion == "Configuracion":
                     pantalla_configuracion()
+                elif opcion == "Puntajes":
+                    mostrar_puntajes()  # Función para mostrar los puntajes
                 elif opcion == "Salir":
                     pygame.quit()
                     exit()
@@ -247,7 +339,7 @@ pantalla_inicio()
 
 # Música de fondo y sonidos
 pygame.mixer.music.load('fondo.mp3')
-pygame.mixer.music.set_volume(0.2)
+pygame.mixer.music.set_volume(volumen)
 pygame.mixer.music.play(-1)  # Reproduce en bucle
 tiempo_ultima_animacion = pygame.time.get_ticks()
 intervalo_animacion = 500  # milisegundos
@@ -274,30 +366,54 @@ while jugando:
                 canal_laser.play(sonido_laser, maxtime=300)
             elif evento.key == pygame.K_p:
                 en_pausa = not en_pausa
-
         elif evento.type == pygame.KEYUP:
             if evento.key in (pygame.K_LEFT, pygame.K_RIGHT):
                 jugador_x_cambio = 0
 
     if en_pausa:
+        pygame.mixer.music.pause()
         texto_pausa = fuente_menu.render("PAUSA", True, AMARILLO)
         pantalla.blit(texto_pausa, (350, 250))
         pygame.display.update()
-        continue
 
-    # Disparo enemigo lento: cada ~100 frames
-    if pygame.time.get_ticks() - tiempo_ultimo_disparo > 800:
-        enemigos_primera_fila = [e for e in enemigos if e["vivo"] and e["fila"] == 0]
-        if enemigos_primera_fila:
-            atacante = random.choice(enemigos_primera_fila)
-            balas_enemigas.append({"x": atacante["x"] + 10, "y": atacante["y"] + 20})
-            tiempo_ultimo_disparo = pygame.time.get_ticks()
-            canal_laser.play(sonido_laser, maxtime=300)
+        # Esperar a que se presione 'P' de nuevo para salir de pausa
+        pausado = True
+        while pausado:
+            for evento in pygame.event.get():
+                if evento.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif evento.type == pygame.KEYDOWN:
+                    if evento.key == pygame.K_p:
+                        pausado = False
+
+        # Contador regresivo antes de volver al juego
+        for cuenta_atras in range(3, 0, -1):
+            pantalla.fill(NEGRO)
+            texto_contador = fuente_menu.render(str(cuenta_atras), True, AMARILLO)
+            pantalla.blit(texto_contador, (380, 250))
+            pygame.display.update()
+            pygame.time.delay(1000)          
+        en_pausa = False
+        pygame.mixer.music.unpause()
+        continue  # Saltar el resto del bucle y volver a iterar
 
     # Movimiento del jugador
     jugador_x += jugador_x_cambio
     jugador_x = max(0, min(jugador_x, 800 - 50))  # Limitar a los bordes
     pantalla.blit(imagen_jugador, (jugador_x, jugador_y))
+
+    # Tiempo actual (se usa para animaciones y disparos)
+    tiempo_actual = pygame.time.get_ticks()
+
+    # Disparo enemigo lento
+    if tiempo_actual - tiempo_ultimo_disparo > 800:
+        enemigos_primera_fila = [e for e in enemigos if e["vivo"] and e["fila"] == 0]
+        if enemigos_primera_fila:
+            atacante = random.choice(enemigos_primera_fila)
+            balas_enemigas.append({"x": atacante["x"] + 10, "y": atacante["y"] + 20})
+            tiempo_ultimo_disparo = tiempo_actual
+            canal_laser.play(sonido_laser, maxtime=300)
 
     # Movimiento en bloque de enemigos
     enemigos_vivos = [e for e in enemigos if e["vivo"]]
@@ -309,21 +425,26 @@ while jugando:
             for e in enemigos:
                 if e["vivo"]:
                     e["y"] += vel_y
-        tiempo_actual = pygame.time.get_ticks()
-        if tiempo_actual - tiempo_ultima_animacion > intervalo_animacion:
-            indice_animacion = (indice_animacion + 1) % len(imagenes_enemigo)
-            tiempo_ultima_animacion = tiempo_actual
+
+    # Actualizar animación enemigos
+    if tiempo_actual - tiempo_ultima_animacion > intervalo_animacion:
+        indice_animacion = (indice_animacion + 1) % len(imagenes_enemigo)
+        tiempo_ultima_animacion = tiempo_actual
 
     # Dibujar enemigos
     for enemigo in enemigos:
         if enemigo["vivo"]:
             enemigo["x"] += direccion * vel_x
-            pantalla.blit(imagenes_enemigo[indice_animacion], (enemigo["x"], enemigo["y"]))
+            imagen_actual = imagenes_enemigo[indice_animacion] if enemigo["fila"] >= 2 else enemigo["imagen"]
+            pantalla.blit(imagen_actual, (enemigo["x"], enemigo["y"]))
 
-            # Game Over si bajan demasiado
-            if enemigo["y"] > 480:
+            # Fin del juego si bajan
+            if vidas <= 0:
                 mostrar_fin_de_juego()
-                jugando = False
+                pantalla_inicio()
+                pygame.display.update()
+                time.sleep(2)
+                  
 
             # Colisión con bala del jugador
             if bala_estado == "disparando":
@@ -333,15 +454,15 @@ while jugando:
                     bala_y = jugador_y
                     bala_estado = "lista"
                     puntaje += 1
-                    if not canal_laser.get_busy():
-                        canal_laser.play(sonido_laser, maxtime=300)
-    # Movimiento de bala del jugador
+    
+    # Movimiento de la bala del jugador
     if bala_estado == "disparando":
         pantalla.blit(imagen_bala, (bala_x, bala_y))
         bala_y -= bala_y_cambio
         if bala_y <= 0:
             bala_y = jugador_y
             bala_estado = "lista"
+
     # Movimiento de balas enemigas y colisiones
     for bala in balas_enemigas[:]:
         bala["y"] += bala_y_cambio
@@ -354,6 +475,8 @@ while jugando:
             if vidas <= 0:
                 mostrar_fin_de_juego()
                 jugando = False
+                pantalla_inicio()
+
 
         # Colisión con muros
         for muro in muros:
@@ -362,22 +485,38 @@ while jugando:
                 balas_enemigas.remove(bala)
                 break
 
-        # Si la bala sale de la pantalla
+        # Si sale de pantalla
         if bala["y"] > 600:
             balas_enemigas.remove(bala)
-
-    # Colisión de bala del jugador con muros
-    for muro in muros:
-        if muro["salud"] > 0 and muro["x"] < bala_x < muro["x"] + 50 and muro["y"] < bala_y < muro["y"] + 40:
-            muro["salud"] -= 1
-            bala_y = jugador_y
-            bala_estado = "lista"
     
+        tiempo_actual = pygame.time.get_ticks()
 
+        if not misterio_activo and tiempo_actual - tiempo_ultimo_misterio > intervalo_misterio:
+            misterio_x = -80
+            misterio_activo = True
+            tiempo_ultimo_misterio = tiempo_actual
+
+        # Mover y dibujar nave misteriosa si está activa
+        if misterio_activo:
+            misterio_x += misterio_vel
+            pantalla.blit(imagen_misterio, (misterio_x, misterio_y))
+
+            # Si sale de pantalla, desactivarla
+            if misterio_x > 800:
+                misterio_activo = False
+
+            # Colisión con la bala del jugador
+            if bala_estado == "disparando":
+                distancia = math.hypot(misterio_x - bala_x, misterio_y - bala_y)
+                if distancia < 30:
+                    puntaje += 10
+                    misterio_activo = False
+                    bala_y = jugador_y
+                    bala_estado = "lista"
     # Dibujar muros
     dibujar_muros()
 
     # Mostrar HUD
     mostrar_puntaje()
     mostrar_vidas()
-    pygame.display.update()
+    pygame.display.update() 

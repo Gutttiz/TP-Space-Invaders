@@ -5,7 +5,6 @@ import sys
 import time
 pygame.init()
 
-
 pantalla = pygame.display.set_mode((800, 600))
 pygame.display.set_caption("Space Invaders")
 
@@ -17,12 +16,12 @@ pygame.display.set_icon(icono)
 imagen_alien = pygame.transform.scale(pygame.image.load('alien.png'), (40, 30))
 imagen_alien1 = pygame.transform.scale(pygame.image.load('alien1.png'), (40, 30))
 
-
 # Nave Misteriosa
 imagen_misterio = pygame.transform.scale(pygame.image.load('misterio.png'), (50, 30))
 misterio_x = -80  # Fuera de pantalla
 misterio_y = 35
 misterio_vel = 0.25
+misterio_activo = False
 tiempo_ultimo_misterio = pygame.time.get_ticks()
 intervalo_misterio = 10000  # 10 segundos
 
@@ -38,7 +37,7 @@ jugador_velocidad = 0.45
 vidas = 3
 #Bala
 imagen_bala_original = pygame.image.load('bala.png')
-imagen_bala = pygame.transform.scale(imagen_bala_original, (30, 30))
+imagen_bala = pygame.transform.scale(imagen_bala_original, (40, 40))
 bala_x = 0
 bala_y = jugador_y
 bala_y_cambio = 0.5
@@ -127,9 +126,9 @@ imagenes_muros = {
     4: pygame.transform.scale(pygame.image.load('Murotarribaderecha.png'), (70, 60)),
     5: pygame.transform.scale(pygame.image.load('Muro.png'), (70, 60))}
 muros = [
-    {"x": 200, "y": 450, "salud": 5},
-    {"x": 400, "y": 450, "salud": 5},
-    {"x": 600, "y": 450, "salud": 5}]
+    {"x": 193, "y": 450, "salud": 5},
+    {"x": 393, "y": 450, "salud": 5},
+    {"x": 593, "y": 450, "salud": 5}]
 
 def dibujar_muros():
     for muro in muros:
@@ -138,11 +137,10 @@ def dibujar_muros():
             pantalla.blit(imagen, (muro["x"], muro["y"]))
 
 # Sonidos
-#sonido_laser = pygame.mixer.Sound('laser.wav')
-#canal_laser = pygame.mixer.Channel(1) 
-#sonido_laser.set_volume(0.3)
-#volumen = 0.1
-
+sonido_laser = pygame.mixer.Sound('laser.wav')
+canal_laser = pygame.mixer.Channel(1) 
+sonido_laser.set_volume(0.3)
+volumen = 0.05
 # Colores
 BLANCO = (255, 255, 255)
 GRIS = (100, 100, 100)
@@ -286,16 +284,16 @@ def pantalla_configuracion():
                     volumen = max(0.0, min(1.0, volumen))  # Asegura que esté en rango
 
         # Actualizar volumen de la música y efectos
-        #pygame.mixer.music.set_volume(volumen)
-        #sonido_laser.set_volume(volumen)
+        pygame.mixer.music.set_volume(volumen)
+        sonido_laser.set_volume(volumen)
 
         pygame.display.update()
 pantalla_inicio()
 
 # Música de fondo y sonidos
-#pygame.mixer.music.load('fondo.mp3')
-#pygame.mixer.music.set_volume(0.2)
-#pygame.mixer.music.play(-1)  # Reproduce en bucle
+pygame.mixer.music.load('fondo.mp3')
+pygame.mixer.music.set_volume(volumen)
+pygame.mixer.music.play(-1)  # Reproduce en bucle
 tiempo_ultima_animacion = pygame.time.get_ticks()
 intervalo_animacion = 500  # milisegundos
 
@@ -318,15 +316,15 @@ while jugando:
                 bala_x = jugador_x + 15
                 bala_y = jugador_y
                 bala_estado = "disparando"
-                #canal_laser.play(sonido_laser, maxtime=300)
+                canal_laser.play(sonido_laser, maxtime=300)
             elif evento.key == pygame.K_p:
                 en_pausa = not en_pausa
-
         elif evento.type == pygame.KEYUP:
             if evento.key in (pygame.K_LEFT, pygame.K_RIGHT):
                 jugador_x_cambio = 0
 
     if en_pausa:
+        pygame.mixer.music.pause()
         texto_pausa = fuente_menu.render("PAUSA", True, AMARILLO)
         pantalla.blit(texto_pausa, (350, 250))
         pygame.display.update()
@@ -348,9 +346,9 @@ while jugando:
             texto_contador = fuente_menu.render(str(cuenta_atras), True, AMARILLO)
             pantalla.blit(texto_contador, (380, 250))
             pygame.display.update()
-            pygame.time.delay(1000)  # Espera 1 segundo
-
+            pygame.time.delay(1000)          
         en_pausa = False
+        pygame.mixer.music.unpause()
         continue  # Saltar el resto del bucle y volver a iterar
 
     # Movimiento del jugador
@@ -368,7 +366,7 @@ while jugando:
             atacante = random.choice(enemigos_primera_fila)
             balas_enemigas.append({"x": atacante["x"] + 10, "y": atacante["y"] + 20})
             tiempo_ultimo_disparo = tiempo_actual
-            #canal_laser.play(sonido_laser, maxtime=300)
+            canal_laser.play(sonido_laser, maxtime=300)
 
     # Movimiento en bloque de enemigos
     enemigos_vivos = [e for e in enemigos if e["vivo"]]
@@ -408,7 +406,7 @@ while jugando:
                     bala_y = jugador_y
                     bala_estado = "lista"
                     puntaje += 1
-
+    
     # Movimiento de la bala del jugador
     if bala_estado == "disparando":
         pantalla.blit(imagen_bala, (bala_x, bala_y))
@@ -429,7 +427,6 @@ while jugando:
             if vidas <= 0:
                 mostrar_fin_de_juego()
                 jugando = False
-                time.sleep(2)
                 pantalla_inicio()
 
 
@@ -443,26 +440,31 @@ while jugando:
         # Si sale de pantalla
         if bala["y"] > 600:
             balas_enemigas.remove(bala)
+    
+        tiempo_actual = pygame.time.get_ticks()
 
-    # Colisión de bala del jugador con muros
-    for muro in muros:
-        if muro["salud"] > 0 and muro["x"] < bala_x < muro["x"] + 50 and muro["y"] < bala_y < muro["y"] + 40:
-            muro["salud"] -= 1
-            bala_y = jugador_y
-            bala_estado = "lista"
+        if not misterio_activo and tiempo_actual - tiempo_ultimo_misterio > intervalo_misterio:
+            misterio_x = -80
+            misterio_activo = True
+            tiempo_ultimo_misterio = tiempo_actual
 
-    # Movimiento y aparición de la nave misteriosa
-    if tiempo_actual - tiempo_ultimo_misterio > intervalo_misterio:
-        misterio_x = -80
-        tiempo_ultimo_misterio = tiempo_actual
+        # Mover y dibujar nave misteriosa si está activa
+        if misterio_activo:
+            misterio_x += misterio_vel
+            pantalla.blit(imagen_misterio, (misterio_x, misterio_y))
 
-    if misterio_x < 800:
-        misterio_x += misterio_vel
-        pantalla.blit(imagen_misterio, (misterio_x, misterio_y))
-    nombre = "Jugador1"  # o pedí el nombre con un input o campo de texto
-    guardar_puntaje(nombre, puntaje)
+            # Si sale de pantalla, desactivarla
+            if misterio_x > 800:
+                misterio_activo = False
 
-
+            # Colisión con la bala del jugador
+            if bala_estado == "disparando":
+                distancia = math.hypot(misterio_x - bala_x, misterio_y - bala_y)
+                if distancia < 30:
+                    puntaje += 10
+                    misterio_activo = False
+                    bala_y = jugador_y
+                    bala_estado = "lista"
     # Dibujar muros
     dibujar_muros()
 
